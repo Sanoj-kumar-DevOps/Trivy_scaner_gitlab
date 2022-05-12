@@ -1,0 +1,42 @@
+### Trivy test
+trivy:
+  stage: test
+  image: docker:stable
+  services:
+    - name: docker:dind
+      entrypoint: [""]
+      command: ["dockerd-entrypoint.sh"]
+  variables:
+    TRIVY_USERNAME: "$CI_REGISTRY_USER"       #gitlab user
+    TRIVY_PASSWORD: "$CI_REGISTRY_PASSWORD"   #gitlab_password
+    TRIVY_AUTH_URL: "$CI_REGISTRY"            #gitlab_registry
+    FULL_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+    DOCKER_DRIVER: overlay2
+    # See https://github.com/docker-library/docker/pull/166
+    DOCKER_TLS_CERTDIR: ""
+    IMAGE: trivy-ci-test:$CI_COMMIT_SHA
+  before_script:
+   #optional- refered the same in the above line 
+   #- docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - export TRIVY_VERSION=$(wget -qO - "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+    - echo $TRIVY_VERSION
+    #Below line will fetch the latest version automatically 
+    - wget --no-verbose https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz -O - | tar -zxvf -
+  allow_failure: true
+  script:
+    # Build image
+    - docker build -t $IMAGE .
+    # Build report
+    - ./trivy --cache-dir .trivycache/ image --exit-code 0 --no-progress --format template --template "@contrib/gitlab.tpl" -o gl-container-scanning-report.json $IMAGE
+    # Print report
+    - ./trivy --cache-dir .trivycache/ image --exit-code 0 --no-progress --severity HIGH $IMAGE
+    # Fail on severe vulnerabilities
+    - ./trivy --cache-dir .trivycache/ image --exit-code 1 --severity CRITICAL --no-progress $IMAGE
+  cache:
+    paths:
+      - .trivycache/
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+ 
+

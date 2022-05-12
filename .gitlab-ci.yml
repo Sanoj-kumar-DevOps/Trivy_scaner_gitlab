@@ -16,8 +16,8 @@ trivy:
     DOCKER_TLS_CERTDIR: ""
     IMAGE: trivy-ci-test:$CI_COMMIT_SHA
   before_script:
-   #optional- refered the same in the above line 
-   #- docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - apk add --no-cache curl docker-cli
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
     - export TRIVY_VERSION=$(wget -qO - "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
     - echo $TRIVY_VERSION
     #Below line will fetch the latest version automatically 

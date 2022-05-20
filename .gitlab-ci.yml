@@ -1,29 +1,41 @@
 
 ### Copy paste the below line as it is############
+### Trivy_test###
 trivy:
   stage: test
   image: docker:stable
+  interruptible: true
   services:
     - name: docker:dind
       entrypoint: [""]
       command: ["dockerd-entrypoint.sh"]
   variables:
-    TRIVY_USERNAME: "$CI_REGISTRY_USER"       #gitlab user
-    TRIVY_PASSWORD: "$CI_REGISTRY_PASSWORD"   #gitlab_password
-    TRIVY_AUTH_URL: "$CI_REGISTRY"            #gitlab_registry
+    TRIVY_OFFLINE_SCAN: "true"
+    TRIVY_USERNAME: "$CI_REGISTRY_USER"
+    TRIVY_PASSWORD: "$CI_REGISTRY_PASSWORD"
+    TRIVY_AUTH_URL: "$CI_REGISTRY"
     FULL_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
     DOCKER_DRIVER: overlay2
     # See https://github.com/docker-library/docker/pull/166
     DOCKER_TLS_CERTDIR: ""
     IMAGE: trivy-ci-test:$CI_COMMIT_SHA
+    TRIVY_EXIT_CODE: "1"
+    TRIVY_VULN_TYPE: "os,library"
+    TRIVY_TIMEOUT: "15m"   # Default time is 5m but you cn increase it when its come to scanning compled repositories 
+    TRIVY_DEBUG: "true"  
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  when: on_success
   before_script:
     - apk add --no-cache curl docker-cli
+    # Same mentioned as variable 
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
     - export TRIVY_VERSION=$(wget -qO - "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
     - echo $TRIVY_VERSION
-    #Below line will fetch the latest version automatically 
     - wget --no-verbose https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz -O - | tar -zxvf -
-  allow_failure: true
   script:
     # Build image
     - docker build -t $IMAGE .
@@ -33,11 +45,20 @@ trivy:
     - ./trivy --cache-dir .trivycache/ image --exit-code 0 --no-progress --severity HIGH $IMAGE
     # Fail on severe vulnerabilities
     - ./trivy --cache-dir .trivycache/ image --exit-code 1 --severity CRITICAL --no-progress $IMAGE
+    
   cache:
     paths:
       - .trivycache/
   artifacts:
-    reports:
-      container_scanning: gl-container-scanning-report.json
+    when: always
+    paths:
+      - report
+    expire_in: 1 week
+  only: 
+      - tags
+  allow_failure: true
+
+### Trivy end####
+
  
 

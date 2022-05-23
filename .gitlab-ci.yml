@@ -1,6 +1,7 @@
 
 ### Copy paste the below line as it is############
 ### Trivy_test###
+### Trivy_test###
 trivy:
   stage: test
   image: docker:stable
@@ -19,10 +20,12 @@ trivy:
     # See https://github.com/docker-library/docker/pull/166
     DOCKER_TLS_CERTDIR: ""
     IMAGE: trivy-ci-test:$CI_COMMIT_SHA
+    #TRIVY_DEBUG: "true"
+    #TRIVY_SEVERITY: "HIGH,CRITICAL"
     TRIVY_EXIT_CODE: "1"
     TRIVY_VULN_TYPE: "os,library"
-    TRIVY_TIMEOUT: "15m"   # Default time is 5m but you cn increase it when its come to scanning compled repositories 
-    TRIVY_DEBUG: "true"  
+    TRIVY_TIMEOUT: "15m"
+    TRIVY_DEBUG: "true"
   retry:
     max: 2
     when:
@@ -36,6 +39,7 @@ trivy:
     - export TRIVY_VERSION=$(wget -qO - "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
     - echo $TRIVY_VERSION
     - wget --no-verbose https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz -O - | tar -zxvf -
+  allow_failure: true
   script:
     # Build image
     - docker build -t $IMAGE .
@@ -49,16 +53,9 @@ trivy:
   cache:
     paths:
       - .trivycache/
-  artifacts:
-    when: always
-    paths:
-      - report
-    expire_in: 1 week
-  only: 
-      - tags
-  allow_failure: true
-
-### Trivy end####
+      
+      
+###End###
 
  
 
